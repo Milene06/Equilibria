@@ -8,4 +8,5 @@ public interface HorarioRepository extends JpaRepository<Horario, Long> {
     List<Horario> findByCursoIdCursoAndUsuarioIdUsuario(Long cursoId, Long usuarioId);
     boolean existsByIdHorarioAndUsuarioIdUsuario(Long id, Long usuarioId);
     void deleteByCursoIdCurso(Long cursoId);
+    void deleteByUsuarioIdUsuarioAndIaGeneradoTrue(Long usuarioId);
 }
