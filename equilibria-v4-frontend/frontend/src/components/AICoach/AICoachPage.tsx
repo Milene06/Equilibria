@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { priorizarTareas, generarHorario, getFraseMotivacional, reagendarTareas, sendFeedback } from '../../api'
+import { useState, useEffect } from 'react'
+import { priorizarTareas, generarHorario, getFraseMotivacional, reagendarTareas, sendFeedback, getHorariosClase, createHorarioClase, updateHorarioClase, deleteHorarioClase } from '../../api'
 
 const COLORES: Record<string,string> = {
   ESTUDIO:'#1F4FA820', DESCANSO:'#2DA39B20', CLASE:'#7c3aed20', TIEMPO_LIBRE:'#f5900020'
@@ -8,51 +8,92 @@ const TEXTO: Record<string,string> = {
   ESTUDIO:'#1F4FA8', DESCANSO:'#2DA39B', CLASE:'#7c3aed', TIEMPO_LIBRE:'#f59000'
 }
 const DIAS_ORDEN = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
+const DIAS_BACKEND = ['LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES','SÁBADO']
 
-function HorarioEditable({ horarioRaw }: { horarioRaw: string }) {
-  const parseado = (() => {
-    try { return typeof horarioRaw === 'string' ? JSON.parse(horarioRaw) : horarioRaw }
-    catch { return null }
-  })()
+function normalizarDiaDisplay(dia: string) {
+  const idx = DIAS_BACKEND.indexOf((dia || '').toUpperCase())
+  return idx >= 0 ? DIAS_ORDEN[idx] : dia
+}
 
-  const [bloques, setBloques] = useState<any[]>(parseado || [])
-  const [editando, setEditando] = useState<{dia:string, idx:number}|null>(null)
+function HorarioEditable({ bloquesIniciales, onChange }: { bloquesIniciales: any[], onChange?: () => void }) {
+  const [bloques, setBloques] = useState<any[]>(() =>
+    bloquesIniciales.map(b => ({ ...b, _key: b.idHorario ?? `tmp-${Math.random()}` }))
+  )
+  const [editandoKey, setEditandoKey] = useState<string|null>(null)
+  const [guardando, setGuardando] = useState(false)
 
-  if (!parseado) return (
-    <pre style={{fontSize:12,lineHeight:1.7,whiteSpace:'pre-wrap',background:'#f8f9fd',padding:14,borderRadius:8}}>{horarioRaw}</pre>
+  useEffect(() => {
+    setBloques(bloquesIniciales.map(b => ({ ...b, _key: b.idHorario ?? `tmp-${Math.random()}` })))
+  }, [bloquesIniciales])
+
+  if (!bloques || bloques.length === 0) return (
+    <div style={{fontSize:13,color:'var(--muted)',textAlign:'center',padding:20}}>Sin bloques aún. Agrega uno con el botón + en cada día.</div>
   )
 
-  const diasActivos = DIAS_ORDEN.filter(d => bloques.some((b:any) => b.dia === d))
-  const porDia = (dia: string) => bloques.filter((b:any) => b.dia === dia)
+  const diasActivos = DIAS_ORDEN.filter(d => bloques.some((b:any) => normalizarDiaDisplay(b.dia) === d))
+  const porDia = (dia: string) => bloques.filter((b:any) => normalizarDiaDisplay(b.dia) === dia)
   const maxRows = Math.max(...diasActivos.map(d => porDia(d).length), 1)
 
-  const updateBloque = (dia: string, idx: number, field: string, val: string) => {
-    let count = 0
-    setBloques(prev => prev.map(b => {
-      if (b.dia === dia) {
-        const esEste = count === idx
-        count++
-        if (esEste) return { ...b, [field]: val }
+  const persistirBloque = async (b: any): Promise<number|null> => {
+    setGuardando(true)
+    try {
+      const payload = {
+        dia: DIAS_BACKEND[DIAS_ORDEN.indexOf(normalizarDiaDisplay(b.dia))] || 'LUNES',
+        horaInicio: b.horaInicio,
+        horaFin: b.horaFin,
+        actividad: b.actividad,
+        tipo: b.tipo,
+        iaGenerado: true
       }
-      return b
-    }))
+      if (b.idHorario) {
+        await updateHorarioClase(b.idHorario, payload)
+        return b.idHorario
+      } else {
+        const res = await createHorarioClase(payload)
+        return res.data.idHorario
+      }
+    } catch (e) {
+      console.error('Error guardando bloque', e)
+      return null
+    } finally {
+      setGuardando(false)
+    }
   }
 
-  const eliminarBloque = (dia: string, idx: number) => {
-    let count = 0
-    setBloques(prev => prev.filter(b => {
-      if (b.dia === dia) {
-        const esEste = count === idx
-        count++
-        if (esEste) return false
-      }
-      return true
-    }))
-    setEditando(null)
+  const updateBloque = (key: string, field: string, val: string) => {
+    setBloques(prev => prev.map(b => b._key === key ? { ...b, [field]: val } : b))
   }
 
-  const agregarBloque = (dia: string) => {
-    setBloques(prev => [...prev, { dia, horaInicio:'08:00', horaFin:'09:00', actividad:'Nueva actividad', tipo:'ESTUDIO' }])
+  const guardarBloque = async (key: string) => {
+    const b = bloques.find(x => x._key === key)
+    if (!b) return
+    const idHorario = await persistirBloque(b)
+    if (idHorario) {
+      setBloques(prev => prev.map(x => x._key === key ? { ...x, idHorario } : x))
+    }
+    setEditandoKey(null)
+    onChange?.()
+  }
+
+  const eliminarBloque = async (key: string) => {
+    const b = bloques.find(x => x._key === key)
+    if (b?.idHorario) {
+      try { await deleteHorarioClase(b.idHorario) } catch (e) { console.error(e) }
+    }
+    setBloques(prev => prev.filter(x => x._key !== key))
+    setEditandoKey(null)
+    onChange?.()
+  }
+
+  const agregarBloque = async (dia: string) => {
+    const key = `tmp-${Math.random()}`
+    const nuevo = { dia, horaInicio:'08:00', horaFin:'09:00', actividad:'Nueva actividad', tipo:'ESTUDIO', _key: key }
+    setBloques(prev => [...prev, nuevo])
+    const idHorario = await persistirBloque(nuevo)
+    if (idHorario) {
+      setBloques(prev => prev.map(x => x._key === key ? { ...x, idHorario } : x))
+    }
+    onChange?.()
   }
 
   return (
@@ -61,7 +102,7 @@ function HorarioEditable({ horarioRaw }: { horarioRaw: string }) {
         {['ESTUDIO','CLASE','DESCANSO','TIEMPO_LIBRE'].map(t => (
           <span key={t} style={{fontSize:10,padding:'2px 8px',borderRadius:999,background:COLORES[t],color:TEXTO[t],fontWeight:600}}>{t}</span>
         ))}
-        <span style={{fontSize:10,color:'var(--muted)'}}>· Haz clic en una celda para editar</span>
+        <span style={{fontSize:10,color:'var(--muted)'}}>· Haz clic en una celda para editar{guardando ? ' · Guardando...' : ''}</span>
       </div>
       <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
         <thead>
@@ -81,12 +122,12 @@ function HorarioEditable({ horarioRaw }: { horarioRaw: string }) {
               {diasActivos.map(d => {
                 const diaItems = porDia(d)
                 const b = diaItems[i]
-                const isEditing = editando?.dia === d && editando?.idx === i
+                const isEditing = b && editandoKey === b._key
                 return (
                   <td key={d} style={{padding:4,border:'1px solid #e5e7eb',verticalAlign:'top',background: b ? COLORES[b.tipo]||'#f8f9fd' : '#fff',minWidth:120}}>
                     {b && !isEditing && (
-                      <div style={{cursor:'pointer',padding:2}} onClick={() => setEditando({dia:d,idx:i})}>
-                        <div style={{fontSize:10,fontWeight:700,color:TEXTO[b.tipo]||'#333'}}>{b.horaInicio} – {b.horaFin}</div>
+                      <div style={{cursor:'pointer',padding:2}} onClick={() => setEditandoKey(b._key)}>
+                        <div style={{fontSize:10,fontWeight:700,color:TEXTO[b.tipo]||'#333'}}>{b.horaInicio?.substring(0,5)} – {b.horaFin?.substring(0,5)}</div>
                         <div style={{fontSize:11,marginTop:2,lineHeight:1.4}}>{b.actividad}</div>
                         <div style={{fontSize:9,color:'#999',marginTop:2}}>{b.tipo}</div>
                       </div>
@@ -94,23 +135,25 @@ function HorarioEditable({ horarioRaw }: { horarioRaw: string }) {
                     {b && isEditing && (
                       <div style={{display:'flex',flexDirection:'column',gap:3}}>
                         <input style={{fontSize:10,padding:'2px 4px',border:'1px solid #ddd',borderRadius:4,width:'100%',boxSizing:'border-box'}}
-                          value={b.horaInicio} onChange={e => updateBloque(d,i,'horaInicio',e.target.value)} placeholder="08:00" />
+                          type="time"
+                          value={b.horaInicio?.substring(0,5)} onChange={e => updateBloque(b._key,'horaInicio',e.target.value)} />
                         <input style={{fontSize:10,padding:'2px 4px',border:'1px solid #ddd',borderRadius:4,width:'100%',boxSizing:'border-box'}}
-                          value={b.horaFin} onChange={e => updateBloque(d,i,'horaFin',e.target.value)} placeholder="09:00" />
+                          type="time"
+                          value={b.horaFin?.substring(0,5)} onChange={e => updateBloque(b._key,'horaFin',e.target.value)} />
                         <input style={{fontSize:10,padding:'2px 4px',border:'1px solid #ddd',borderRadius:4,width:'100%',boxSizing:'border-box'}}
-                          value={b.actividad} onChange={e => updateBloque(d,i,'actividad',e.target.value)} />
+                          value={b.actividad} onChange={e => updateBloque(b._key,'actividad',e.target.value)} />
                         <select style={{fontSize:10,padding:'2px 4px',border:'1px solid #ddd',borderRadius:4}}
-                          value={b.tipo} onChange={e => updateBloque(d,i,'tipo',e.target.value)}>
-                          <option>ESTUDIO</option>
-                          <option>CLASE</option>
-                          <option>DESCANSO</option>
-                          <option>TIEMPO_LIBRE</option>
+                          value={b.tipo} onChange={e => updateBloque(b._key,'tipo',e.target.value)}>
+                          <option value="ESTUDIO">ESTUDIO</option>
+                          <option value="CLASE">CLASE</option>
+                          <option value="DESCANSO">DESCANSO</option>
+                          <option value="TIEMPO_LIBRE">TIEMPO_LIBRE</option>
                         </select>
                         <div style={{display:'flex',gap:3,marginTop:2}}>
                           <button style={{flex:1,fontSize:9,padding:'3px',background:'var(--blue)',color:'#fff',border:'none',borderRadius:3,cursor:'pointer'}}
-                            onClick={() => setEditando(null)}>✓ Listo</button>
+                            onClick={() => guardarBloque(b._key)}>✓ Guardar</button>
                           <button style={{fontSize:9,padding:'3px 6px',background:'#fee2e2',color:'#dc2626',border:'none',borderRadius:3,cursor:'pointer'}}
-                            onClick={() => eliminarBloque(d,i)}>✕</button>
+                            onClick={() => eliminarBloque(b._key)}>✕</button>
                         </div>
                       </div>
                     )}
@@ -131,12 +174,34 @@ export default function AICoachPage() {
   const [type, setType] = useState('')
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
+  const [bloquesHorario, setBloquesHorario] = useState<any[]>([])
+
+  const cargarHorarioGuardado = async () => {
+    try {
+      const r = await getHorariosClase()
+      const iaBloques = r.data.filter((h: any) => h.iaGenerado)
+      if (iaBloques.length > 0) {
+        setBloquesHorario(iaBloques)
+        setType('horario')
+        setResult({ horario: 'persisted' })
+      }
+    } catch {}
+  }
+
+  useEffect(() => { cargarHorarioGuardado() }, [])
 
   const run = async (fn: () => Promise<any>, t: string) => {
     setLoading(true); setType(t); setMsg(''); setResult(null)
     try {
       const r = await fn()
       setResult(r.data)
+      if (t === 'horario') {
+        try {
+          const parsed = JSON.parse(r.data.horario)
+          setBloquesHorario(parsed)
+        } catch { setBloquesHorario([]) }
+        setTimeout(() => cargarHorarioGuardado(), 500)
+      }
     } catch { setMsg('Error al consultar la IA. Verifica la API key.') }
     finally { setLoading(false) }
   }
@@ -195,19 +260,19 @@ export default function AICoachPage() {
       {result && type === 'horario' && (
         <div className="card" style={{marginBottom:16}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-            <span style={{fontWeight:600}}>Horario semanal generado por IA</span>
+            <span style={{fontWeight:600}}>Horario semanal — editable y guardado automáticamente</span>
             <div style={{display:'flex',gap:6}}>
               <button className="btn btn-ghost btn-sm" onClick={() => feedback(true)}>👍 Útil</button>
               <button className="btn btn-ghost btn-sm" onClick={() => feedback(false)}>👎</button>
             </div>
           </div>
-          <HorarioEditable horarioRaw={result.horario} />
+          <HorarioEditable bloquesIniciales={bloquesHorario} onChange={cargarHorarioGuardado} />
         </div>
       )}
 
       {result && type === 'frase' && (
         <div style={{background:'linear-gradient(135deg,var(--teal2),var(--teal))',borderRadius:12,padding:'16px 20px',color:'#fff',marginBottom:16}}>
-          <div style={{fontSize:11,opacity:.8,marginBottom:5}}>WellnessAdvisor — Gemini 2.0 Flash</div>
+          <div style={{fontSize:11,opacity:.8,marginBottom:5}}>WellnessAdvisor</div>
           <div style={{fontSize:14,fontStyle:'italic',lineHeight:1.65}}>{result.frase}</div>
           <div style={{display:'flex',gap:6,marginTop:10}}>
             <button onClick={() => feedback(true)} style={{background:'rgba(255,255,255,.2)',border:'none',cursor:'pointer',padding:'4px 10px',borderRadius:6,color:'#fff',fontSize:12}}>👍</button>
