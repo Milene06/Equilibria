@@ -78,3 +78,4 @@ export const getResumenSemanalConfig = () => api.get('/preferences/resumen-seman
 export const getHorariosClase = () => api.get('/horarios-clase')
 export const createHorarioClase = (data: any) => api.post('/horarios-clase', data)
 export const deleteHorarioClase = (id: number) => api.delete(`/horarios-clase/${id}`)
+export const updateHorarioClase = (id: number, data: any) => api.put(`/horarios-clase/${id}`, data)
