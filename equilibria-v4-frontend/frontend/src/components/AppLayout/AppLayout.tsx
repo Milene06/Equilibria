@@ -22,17 +22,24 @@ export default function AppLayout() {
   const { user, logout, isAdmin } = useAuth()
   const navigate = useNavigate()
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('eq_dark') === 'true')
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     document.body.classList.toggle('dark', darkMode)
     localStorage.setItem('eq_dark', String(darkMode))
   }, [darkMode])
 
+  // Cierra el menú al cambiar de ruta
+  const handleNavClick = () => setMenuOpen(false)
+
   const initials = (user?.nombre || 'U').split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase()
 
   return (
     <div className="layout">
-      <aside className="sidebar">
+      {/* Overlay oscuro cuando el menú está abierto en móvil */}
+      {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />}
+
+      <aside className={`sidebar${menuOpen ? ' sidebar-open' : ''}`}>
         <div className="sidebar-logo">
           <img src={logoEquilibria} alt="Equilibria" style={{width:38,height:38,borderRadius:10,objectFit:'cover',flexShrink:0}} />
           <div style={{flex:1}}>
@@ -45,12 +52,12 @@ export default function AppLayout() {
         </div>
         <nav className="sidebar-nav">
           {NAV.map(n => (
-            <NavLink key={n.to} to={n.to} className={({isActive}) => `nav-item${isActive?' active':''}`}>
+            <NavLink key={n.to} to={n.to} className={({isActive}) => `nav-item${isActive?' active':''}`} onClick={handleNavClick}>
               <span className="nav-icon">{n.icon}</span>{n.label}
             </NavLink>
           ))}
           {isAdmin && (
-            <NavLink to="/admin" className={({isActive}) => `nav-item${isActive?' active':''}`}>
+            <NavLink to="/admin" className={({isActive}) => `nav-item${isActive?' active':''}`} onClick={handleNavClick}>
               <span className="nav-icon">🛡️</span>Administración
             </NavLink>
           )}
@@ -66,9 +73,26 @@ export default function AppLayout() {
           </div>
         </div>
       </aside>
-      <main className="main-content">
-        <Outlet />
-      </main>
+
+      <div className="main-wrapper">
+        {/* Topbar solo en móvil */}
+        <header className="mobile-topbar">
+          <button className="hamburger" onClick={() => setMenuOpen(o => !o)}>
+            <span /><span /><span />
+          </button>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <img src={logoEquilibria} alt="Equilibria" style={{width:28,height:28,borderRadius:7,objectFit:'cover'}} />
+            <span style={{fontWeight:700,fontSize:15,color:'var(--blue)'}}>Equilibria</span>
+          </div>
+          <button className="dark-toggle" onClick={() => setDarkMode(d => !d)}>
+            {darkMode ? '☀️' : '🌙'}
+          </button>
+        </header>
+
+        <main className="main-content">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }
