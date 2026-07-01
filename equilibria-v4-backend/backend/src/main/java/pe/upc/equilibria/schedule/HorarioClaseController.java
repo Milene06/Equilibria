@@ -16,7 +16,7 @@ import java.util.Map;
 
 @RestController @RequestMapping("/horarios-clase")
 @RequiredArgsConstructor
-@Tag(name="HorariosClase", description="Horarios de clase por curso")
+@Tag(name="HorariosClase", description="Horarios de clase y bloques editables")
 public class HorarioClaseController {
     private final HorarioRepository horarioRepo;
     private final CursoRepository cursoRepo;
@@ -35,8 +35,8 @@ public class HorarioClaseController {
     public ResponseEntity<?> create(@AuthenticationPrincipal UserDetails ud,
                                     @RequestBody HorarioRequest rq) {
         Usuario u = getUser(ud);
-        var curso = cursoRepo.findById(rq.getIdCurso()).orElse(null);
-        if (curso == null || !curso.getUsuario().getIdUsuario().equals(u.getIdUsuario())) {
+        var curso = rq.getIdCurso() != null ? cursoRepo.findById(rq.getIdCurso()).orElse(null) : null;
+        if (rq.getIdCurso() != null && (curso == null || !curso.getUsuario().getIdUsuario().equals(u.getIdUsuario()))) {
             return ResponseEntity.badRequest().build();
         }
         Horario h = Horario.builder()
@@ -45,10 +45,26 @@ public class HorarioClaseController {
                 .dia(rq.getDia())
                 .horaInicio(LocalTime.parse(rq.getHoraInicio()))
                 .horaFin(LocalTime.parse(rq.getHoraFin()))
-                .actividad(curso.getNombre())
-                .tipo("CLASE")
-                .iaGenerado(false)
+                .actividad(rq.getActividad() != null ? rq.getActividad() : (curso != null ? curso.getNombre() : "Actividad"))
+                .tipo(rq.getTipo() != null ? rq.getTipo() : "CLASE")
+                .iaGenerado(Boolean.TRUE.equals(rq.getIaGenerado()))
                 .build();
+        return ResponseEntity.ok(horarioRepo.save(h));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> update(@AuthenticationPrincipal UserDetails ud,
+                                    @PathVariable Long id,
+                                    @RequestBody HorarioRequest rq) {
+        Long uid = getUser(ud).getIdUsuario();
+        if (!horarioRepo.existsByIdHorarioAndUsuarioIdUsuario(id, uid))
+            return ResponseEntity.notFound().build();
+        Horario h = horarioRepo.findById(id).get();
+        if (rq.getDia() != null) h.setDia(rq.getDia());
+        if (rq.getHoraInicio() != null) h.setHoraInicio(LocalTime.parse(rq.getHoraInicio()));
+        if (rq.getHoraFin() != null) h.setHoraFin(LocalTime.parse(rq.getHoraFin()));
+        if (rq.getActividad() != null) h.setActividad(rq.getActividad());
+        if (rq.getTipo() != null) h.setTipo(rq.getTipo());
         return ResponseEntity.ok(horarioRepo.save(h));
     }
 
@@ -68,5 +84,8 @@ public class HorarioClaseController {
         String dia;
         String horaInicio;
         String horaFin;
+        String actividad;
+        String tipo;
+        Boolean iaGenerado;
     }
 }
