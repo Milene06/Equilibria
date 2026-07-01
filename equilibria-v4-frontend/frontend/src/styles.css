@@ -66,3 +66,21 @@ body.dark [style*="background:#f4f6fb"]{background:#242736 !important;color:#e2e
 body.dark [style*="background: #f4f6fb"]{background:#242736 !important;color:#e2e8f0 !important}
 body.dark [style*="background:#f4f6fb"] div{color:#e2e8f0 !important}
 body.dark [style*="background:#f4f6fb"] .form-label{color:#94a3b8 !important}
+body.dark [style*="background:#f8f9fd"]{background:#242736 !important;color:#e2e8f0 !important}
+body.dark [style*="background: #f8f9fd"]{background:#242736 !important;color:#e2e8f0 !important}
+
+
+@media (max-width: 768px) {
+  .grid-2, .grid-3, .grid-4{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+  .page-header{flex-direction:column;align-items:flex-start;gap:10px}
+  .card{padding:14px}
+  .kpi{padding:14px}
+  .modal{padding:18px}
+  .btn{font-size:12px;padding:8px 12px}
+}
+
+@media (max-width: 480px) {
+  .page-title{font-size:17px}
+  .kpi-value{font-size:22px}
+}
