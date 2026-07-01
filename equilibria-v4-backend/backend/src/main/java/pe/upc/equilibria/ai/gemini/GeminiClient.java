@@ -25,7 +25,7 @@ public class GeminiClient {
             messages.add(message);
 
             Map<String,Object> body = new HashMap<>();
-            body.put("model", "nvidia/nemotron-3-ultra-550b-a55b:free");
+            body.put("model", "openrouter/auto");
             body.put("messages", messages);
 
             HttpHeaders h = new HttpHeaders();
@@ -37,12 +37,12 @@ public class GeminiClient {
             var msg = (Map<?,?>) ((Map<?,?>) choices.get(0)).get("message");
             String content = msg.get("content").toString();
 
-            // Limpiar markdown code blocks si vienen en la respuesta
+    
             content = content.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*", "").trim();
             return content;
         } catch (Exception e) {
             System.out.println("ERROR GEMINI: " + e.getMessage());
-            return "[]";
+            return "";
         }
     }
 }
