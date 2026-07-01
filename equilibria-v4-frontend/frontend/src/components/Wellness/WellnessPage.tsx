@@ -67,7 +67,7 @@ export default function WellnessPage() {
             <div style={{fontSize:48,fontWeight:700,color:nivelColor(historial[0].nivel)}}>{historial[0].puntuacion}<span style={{fontSize:18,color:'#999'}}>/40</span></div>
             <div style={{display:'inline-block',padding:'5px 18px',borderRadius:999,fontWeight:700,background:nivelColor(historial[0].nivel)+'20',color:nivelColor(historial[0].nivel),marginTop:8}}>Estrés {historial[0].nivel}</div>
             <div style={{marginTop:12,fontSize:13,lineHeight:1.7,textAlign:'left',background:'var(--blue-l)',borderRadius:10,padding:14}}
-              dangerouslySetInnerHTML={{__html: renderMd(historial[0].consejosIa)}} />
+              dangerouslySetInnerHTML={{__html: (historial[0].consejosIa && historial[0].consejosIa !== '[]') ? renderMd(historial[0].consejosIa) : ''}} />
           </div>
         </div>
       )}
@@ -77,7 +77,7 @@ export default function WellnessPage() {
           <div style={{fontWeight:600,marginBottom:4}}>PSS-10 — Cohen, Kamarck & Mermelstein (1983)</div>
           <div style={{fontSize:12,color:'var(--muted)',marginBottom:16}}>Responde sobre el <strong>último mes</strong>. Ítems invertidos se calculan automáticamente.</div>
           {cuestionario.preguntas.map((q: any) => (
-            <div key={q.numero} style={{background:'#f8f9fd',borderRadius:9,padding:14,marginBottom:10}}>
+            <div key={q.numero} style={{background:'var(--surface)',borderRadius:9,padding:14,marginBottom:10,border:'1px solid var(--border)'}}>
               <div style={{fontSize:13,fontWeight:500,marginBottom:10}}>{q.numero}. {q.pregunta}{q.invertida && <span style={{fontSize:10,color:'#999',marginLeft:5}}>(invertida)</span>}</div>
               <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
                 {cuestionario.opciones.map((o: string, j: number) => (
@@ -88,7 +88,7 @@ export default function WellnessPage() {
             </div>
           ))}
           <div style={{fontSize:12,color:'#999',marginBottom:12}}>Respondidas: {Object.keys(respuestas).length}/10</div>
-          <button className="btn btn-primary btn-full" onClick={submit}>✦ Calcular + consultar WellnessAdvisor</button>
+          <button className="btn btn-primary btn-full" onClick={submit} style={{justifyContent:'center'}}>✦ Calcular + consultar WellnessAdvisor</button>
         </div>
       )}
 
@@ -135,7 +135,7 @@ export default function WellnessPage() {
                 <div style={{marginLeft:'auto',fontSize:11,color:'#999'}}>{new Date(h.fecha).toLocaleDateString('es-PE',{day:'2-digit',month:'long',year:'numeric'})}</div>
               </div>
               <div style={{fontSize:12,color:'var(--muted)',lineHeight:1.65}}
-                dangerouslySetInnerHTML={{__html: renderMd(h.consejosIa)}} />
+                dangerouslySetInnerHTML={{__html: (h.consejosIa && h.consejosIa !== '[]') ? renderMd(h.consejosIa) : ''}} />
             </div>
           ))}
         </div>
