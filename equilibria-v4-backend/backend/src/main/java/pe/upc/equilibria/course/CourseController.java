@@ -3,14 +3,16 @@ package pe.upc.equilibria.course;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.*;
 import lombok.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import pe.upc.equilibria.schedule.HorarioRepository;
 import pe.upc.equilibria.user.*;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -20,6 +22,7 @@ import java.util.Map;
 public class CourseController {
     private final CursoRepository cursoRepo;
     private final UsuarioRepository userRepo;
+    private final HorarioRepository horarioRepo;
 
     private Usuario getUser(UserDetails ud) {
         return userRepo.findByEmail(ud.getUsername()).orElseThrow();
@@ -36,9 +39,9 @@ public class CourseController {
     public ResponseEntity<?> create(@AuthenticationPrincipal UserDetails ud,
                                     @Valid @RequestBody CursoRequest rq) {
         Curso c = Curso.builder().usuario(getUser(ud)).nombre(rq.getNombre())
-            .codigo(rq.getCodigo()).creditos(rq.getCreditos())
-            .color(rq.getColor() != null ? rq.getColor() : "#1F4FA8")
-            .fechaExamen(rq.getFechaExamen()).build();
+                .codigo(rq.getCodigo()).creditos(rq.getCreditos())
+                .color(rq.getColor() != null ? rq.getColor() : "#1F4FA8")
+                .fechaExamen(rq.getFechaExamen()).build();
         return ResponseEntity.ok(cursoRepo.save(c));
     }
 
@@ -58,17 +61,21 @@ public class CourseController {
     }
 
     @DeleteMapping("/{id}")
+    @Transactional
     @Operation(summary="Eliminar curso")
     public ResponseEntity<?> delete(@AuthenticationPrincipal UserDetails ud, @PathVariable Long id) {
         Long uid = getUser(ud).getIdUsuario();
         if (!cursoRepo.existsByIdCursoAndUsuarioIdUsuario(id, uid))
             return ResponseEntity.notFound().build();
+        horarioRepo.deleteByCursoIdCurso(id);
         cursoRepo.deleteById(id);
-        return ResponseEntity.ok(Map.of("ok", true));
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("ok", true);
+        return ResponseEntity.ok(resp);
     }
 
     @Data static class CursoRequest {
-        @NotBlank String nombre;
+        @jakarta.validation.constraints.NotBlank String nombre;
         String codigo; Integer creditos; String color; LocalDate fechaExamen;
     }
 }
