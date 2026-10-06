@@ -27,7 +27,7 @@ public class GeminiClient {
             Map<String,Object> body = new HashMap<>();
             body.put("model", "openrouter/auto");
             body.put("messages", messages);
-            body.put("max_tokens", 1024);
+            body.put("max_tokens", 2048);
 
             HttpHeaders h = new HttpHeaders();
             h.setContentType(MediaType.APPLICATION_JSON);
